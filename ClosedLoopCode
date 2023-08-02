@@ -1,0 +1,132 @@
+#include <TimerOne.h>
+#include <Math.h>
+
+#define scr_trigP   9
+#define scr_trigN   10
+
+int ZC = 0, initial = 0,  zero = 0, zero1 = 0, count = 0;
+volatile int count1 = 0, ZC1 = 0;
+float alpha = 0, sensibilidade = 0.185, corrente = 0;
+
+double Kp = 3.20, //ganho proporcional
+       Ki = 0.01, //ganho integral
+       P = 0.00, //parcela proporcional
+       I = 0.00, //parcela integral
+       Pi = 0.00, // recebe a soma P + I
+       setPoint = 0.3, //corrente média desejada;
+       erro = 0 , //recebe o erro para cálculo do controle;
+       erroant = 0; //erro anterior
+
+
+void setup(void) {
+  Serial.begin(9600);
+  cal_zero(); //função para calibrar o sensor de corrente e retirar o offset
+
+  pinMode(scr_trigP, OUTPUT); // define pino 9 como saída
+  digitalWrite(scr_trigP, LOW);
+
+  pinMode(scr_trigN, OUTPUT); // define pino 10 como saída
+  digitalWrite(scr_trigN, LOW);
+
+  pinMode(2, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(2), ZC_detect, RISING); // habilita interrupção externa pino 2
+
+}
+
+
+
+void ZC_detect() {
+  
+  ZC = 1;
+  ZC1 = 1;
+
+  erro = setPoint - corrente; 
+
+  P = erro * Kp;
+
+  I = I + erro * Ki + erroant * Ki;
+  
+  erroant = erro;
+
+  Pi = P + I;
+
+  if (Pi >= 5) {
+    Pi = 5;
+  }
+  if (Pi <= 0) {
+    Pi = 0;
+  }
+
+  alpha = ( (acos((2.00 * Pi - 5.00) / 5.00) * 180.00 / PI) * 0.01666666) / 360.00 * 1000.00; // calcula o angulo alpha
+
+  if (alpha > 7.333) {
+    alpha = 7.333;
+  }
+  if (alpha < 0.70) {
+    alpha = 0.70;
+  }
+
+  Timer1.attachInterrupt(callback);
+  Timer1.initialize(alpha * 1000);
+
+}
+
+void callback()
+{
+  if (count == 0 && ZC == 1) {
+    digitalWrite(scr_trigP, HIGH);
+    delayMicroseconds(300);
+    digitalWrite(scr_trigP, LOW);
+    ZC = 0;
+    count += 1;
+    TCCR1B &= ~(1 << CS10);
+  }
+
+  if (count == 1 && ZC == 1) {
+    digitalWrite(scr_trigN, HIGH);
+    delayMicroseconds(300);
+    digitalWrite(scr_trigN, LOW);
+    ZC = 0;
+    count -= 1;
+    TCCR1B &= ~(1 << CS10);
+  }
+
+}
+
+void loop() {
+
+  if (count1 == 0 && ZC1 == 1) {
+  corrente = calculaCorrente(CorrenteMedia()); //Calcula a corrente
+  count1 += 1;
+  ZC1 = 0;
+  }
+  if (count1 == 1 && ZC1 == 1) {
+  corrente = calculaCorrente(CorrenteMedia()); //Calcula a corrente
+  count1 -= 1;
+  ZC1 = 0;
+  }
+
+}
+
+int cal_zero() {
+  for (int i = 0; i < 50; i++) {
+    zero += analogRead(A0);
+  }
+  zero1 = zero / 50;
+  return zero1;
+}
+
+float calculaCorrente(int media) {
+  return (media - zero1) * (5.0) / (1023.0 * sensibilidade);
+}
+
+int CorrenteMedia() {
+  long soma = 0, media = 0;
+  int amos = 2000;
+  for (int i = 0; i < amos; i++) {
+    soma += analogRead(A0);
+    delayMicroseconds(100);
+  }
+  media = soma / amos;
+  return (int) media;
+}
