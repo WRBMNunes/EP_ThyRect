@@ -1,0 +1,61 @@
+#define scr_trigP   9
+#define scr_trigN   10
+#define pot       A0
+
+int ZC = 0, initial = 0,  count = 0;
+volatile int alpha=0;
+
+void setup(void) {
+
+  pinMode(scr_trigP, OUTPUT);
+  digitalWrite(scr_trigP, LOW);
+
+  pinMode(scr_trigN, OUTPUT);
+  digitalWrite(scr_trigN, LOW);
+
+  pinMode(2, INPUT_PULLUP);
+
+  attachInterrupt(digitalPinToInterrupt(2), ZCP_detect, RISING);
+ 
+}
+
+void ZCP_detect() {
+  ZC = 1;
+  
+}
+
+void loop() {
+
+     if (count == 0 && ZC == 1) {
+      delayMicroseconds(alpha);
+      digitalWrite(scr_trigP, HIGH);
+      delayMicroseconds(500);
+      digitalWrite(scr_trigP, LOW);
+      ZC = 0;
+      alpha = analogRead(pot) * 10;
+      if (alpha > 7666) {
+        alpha = 7666;
+      }
+      if (alpha < 600)  {
+        alpha = 600;
+      }
+      count += 1;
+    }
+
+    if (count == 1 && ZC == 1) {
+      delayMicroseconds(alpha);
+      digitalWrite(scr_trigN, HIGH);
+      delayMicroseconds(500);
+      digitalWrite(scr_trigN, LOW);
+      ZC = 0;
+      alpha = analogRead(pot) * 10;
+      if (alpha > 7666) {
+        alpha = 7666;
+      }
+      if (alpha < 600) {
+        alpha = 600;
+      }
+      count -= 1;
+    }
+
+}
